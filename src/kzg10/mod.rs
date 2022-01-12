@@ -9,7 +9,7 @@ use crate::{BTreeMap, Error, LabeledPolynomial, PCRandomness, ToString, Vec};
 use ark_ec::msm::{FixedBaseMSM, VariableBaseMSM};
 use ark_ec::{group::Group, AffineCurve, PairingEngine, ProjectiveCurve};
 use ark_ff::{One, PrimeField, UniformRand, Zero, FftParameters, FftField};
-use ark_poly::UVPolynomial;
+use ark_poly::{UVPolynomial, GeneralEvaluationDomain, EvaluationDomain};
 use ark_std::{format, marker::PhantomData, ops::Div, vec};
 
 use ark_std::rand::RngCore;
@@ -415,6 +415,43 @@ where
         proof
     }
 
+    /// On input a polynomial `p` and a point `point`, outputs a proof for the same.
+    pub(crate) fn open_with_lagrange<'a>(
+        powers: &Powers<E>,
+        p: &P,
+        point: P::Point,
+        rand: &Randomness<E::Fr, P>,
+    ) -> Result<Proof<E>, Error> {
+        Self::check_degree_is_too_large(p.degree(), powers.size())?;
+        let open_time = start_timer!(|| format!("Opening polynomial of degree {}", p.degree()));
+
+        let witness_time = start_timer!(|| "Computing witness polynomials");
+        
+        // representation of p in the canonical basis (1, X, ..., X^max_degree)
+
+        let domain =
+            GeneralEvaluationDomain::<E::Fr>::new(p.degree()).unwrap();
+        let p_can = P::from_coefficients_vec(domain.ifft(p.coeffs()));
+
+        let (witness_poly, hiding_witness_poly) = Self::compute_witness_polynomial(&p_can, point, rand)?;
+        end_timer!(witness_time);
+
+        // representation of witness_poly in the lagrange basis
+        // todo
+        println!("todo!");
+
+        let proof = Self::open_with_witness_polynomial(
+            powers,
+            point,
+            rand,
+            &witness_poly,
+            hiding_witness_poly.as_ref(),
+        );
+
+        end_timer!(open_time);
+        proof
+    }
+    
     /// Verifies that `value` is the evaluation at `point` of the polynomial
     /// committed inside `comm`.
     pub fn check(
@@ -663,14 +700,19 @@ mod tests {
             while degree <= 1 {
                 degree = usize::rand(rng) % 20;
             }
-            let pp = KZG10::<E, P>::setup(degree, false, rng)?;
+            degree = 16;
+            let pp = KZG10::<E, P>::setup_with_lagrange::<_, FrFft>(degree, false, rng)?;
             let (ck, vk) = KZG10::<E, P>::trim(&pp, degree)?;
             let p = P::rand(degree, rng);
             let hiding_bound = Some(1);
             let (comm, rand) = KZG10::<E, P>::commit(&ck, &p, hiding_bound, Some(rng))?;
+            
             let point = E::Fr::rand(rng);
-            let value = p.evaluate(&point);
-            let proof = KZG10::<E, P>::open(&ck, &p, point, &rand)?;
+            let domain =
+                GeneralEvaluationDomain::<E::Fr>::new(p.degree()).unwrap();
+            let p_can = P::from_coefficients_vec(domain.ifft(p.coeffs()));
+            let value = p_can.evaluate(&point);
+            let proof = KZG10::<E, P>::open_with_lagrange(&ck, &p, point, &rand)?;
             assert!(
                 KZG10::<E, P>::check(&vk, &comm, point, value, &proof)?,
                 "proof was incorrect for max_degree = {}, polynomial_degree = {}, hiding_bound = {:?}",
