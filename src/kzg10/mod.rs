@@ -8,7 +8,7 @@
 use crate::{BTreeMap, Error, LabeledPolynomial, PCRandomness, ToString, Vec};
 use ark_ec::msm::{FixedBaseMSM, VariableBaseMSM};
 use ark_ec::{group::Group, AffineCurve, PairingEngine, ProjectiveCurve};
-use ark_ff::{One, PrimeField, UniformRand, Zero};
+use ark_ff::{One, PrimeField, UniformRand, Zero, FftParameters, FftField};
 use ark_poly::UVPolynomial;
 use ark_std::{format, marker::PhantomData, ops::Div, vec};
 
@@ -121,6 +121,131 @@ where
 
         let h = h.into_affine();
         let beta_h = h.mul(beta).into_affine();
+        let prepared_h = h.into();
+        let prepared_beta_h = beta_h.into();
+
+        let pp = UniversalParams {
+            powers_of_g,
+            powers_of_gamma_g,
+            h,
+            beta_h,
+            neg_powers_of_h,
+            prepared_h,
+            prepared_beta_h,
+        };
+        end_timer!(setup_time);
+        Ok(pp)
+    }
+
+    /// Constructs public parameters when given as input the maximum degree `degree`
+    /// for the polynomial commitment scheme.
+    pub fn setup_with_lagrange<R: RngCore, FrParams: FftParameters>(
+        max_degree: usize,
+        produce_g2_powers: bool,
+        rng: &mut R,
+    ) -> Result<UniversalParams<E>, Error> {
+        if max_degree < 1 {
+            return Err(Error::DegreeIsZero);
+        }
+        let setup_time = start_timer!(|| format!("KZG10::Setup with degree {}", max_degree));
+        let β = E::Fr::rand(rng);
+        let g = E::G1Projective::rand(rng);
+        let gamma_g = E::G1Projective::rand(rng);
+        let h = E::G2Projective::rand(rng);
+        let ω = E::Fr::get_root_of_unity(max_degree).unwrap();
+
+        // num = prod_{i>=0} (β-ω^i)
+        // den = prod_{i>0}  (1-ω^i)
+        // ω_n_minus_1 = ω^{n-1}
+        let mut num = E::Fr::one();
+        let mut den = E::Fr::one();
+        let mut pow_ω = E::Fr::one();
+        let mut ω_n_minus_1 = E::Fr::one();
+        for i in 0..max_degree {
+            num *= β - pow_ω;
+            if i > 0 {
+                den *= E::Fr::one() - pow_ω;
+            }
+            if i == max_degree {
+                ω_n_minus_1 = pow_ω;
+            }
+            pow_ω *= ω;
+        }
+        
+        // create the [L_0(β), ..., L_{n-1}(β)]
+        let mut lagrange_polys_at_β = vec![E::Fr::one()];
+        let mut num_tmp;
+        // pow_ω = E::Fr::one();
+        for _ in 0..max_degree {
+            num_tmp = num / (β - pow_ω);
+            lagrange_polys_at_β.push(num_tmp / den);
+            pow_ω *= ω;
+            den *= ω_n_minus_1;    
+        }        
+
+        let window_size = FixedBaseMSM::get_mul_window_size(max_degree + 1);
+
+        let scalar_bits = E::Fr::size_in_bits();
+        let g_time = start_timer!(|| "Generating powers of G");
+        let g_table = FixedBaseMSM::get_window_table(scalar_bits, window_size, g);
+        let powers_of_g = FixedBaseMSM::multi_scalar_mul::<E::G1Projective>(
+            scalar_bits,
+            window_size,
+            &g_table,
+            &lagrange_polys_at_β,
+        );
+        end_timer!(g_time);
+        let gamma_g_time = start_timer!(|| "Generating powers of gamma * G");
+        let gamma_g_table = FixedBaseMSM::get_window_table(scalar_bits, window_size, gamma_g);
+        let mut powers_of_gamma_g = FixedBaseMSM::multi_scalar_mul::<E::G1Projective>(
+            scalar_bits,
+            window_size,
+            &gamma_g_table,
+            &lagrange_polys_at_β,
+        );
+        // Add an additional power of gamma_g, because we want to be able to support
+        // up to D queries.
+        powers_of_gamma_g.push(powers_of_gamma_g.last().unwrap().mul(&β));
+        end_timer!(gamma_g_time);
+
+        let powers_of_g = E::G1Projective::batch_normalization_into_affine(&powers_of_g);
+        let powers_of_gamma_g =
+            E::G1Projective::batch_normalization_into_affine(&powers_of_gamma_g)
+                .into_iter()
+                .enumerate()
+                .collect();
+
+        let neg_powers_of_h_time = start_timer!(|| "Generating negative powers of h in G2");
+        let neg_powers_of_h = if produce_g2_powers {
+            let mut neg_lagrange_polys_at_β = vec![E::Fr::one()];
+            let mut cur = E::Fr::one() / &β;
+            for _ in 0..max_degree {
+                neg_lagrange_polys_at_β.push(cur);
+                cur /= &β;
+            }
+
+            let neg_h_table = FixedBaseMSM::get_window_table(scalar_bits, window_size, h);
+            let neg_powers_of_h = FixedBaseMSM::multi_scalar_mul::<E::G2Projective>(
+                scalar_bits,
+                window_size,
+                &neg_h_table,
+                &neg_lagrange_polys_at_β,
+            );
+
+            let affines = E::G2Projective::batch_normalization_into_affine(&neg_powers_of_h);
+            let mut affines_map = BTreeMap::new();
+            affines.into_iter().enumerate().for_each(|(i, a)| {
+                affines_map.insert(i, a);
+            });
+            affines_map
+        } else {
+            BTreeMap::new()
+        };
+
+        end_timer!(neg_powers_of_h_time);
+
+        let h = h.into_affine();
+        let beta_h = h.mul(β).into_affine();
         let prepared_h = h.into();
         let prepared_beta_h = beta_h.into();
 
@@ -456,6 +581,7 @@ mod tests {
     use crate::*;
 
     use ark_bls12_377::Bls12_377;
+    // use ark_bls12_377::FrParameters;
     use ark_bls12_381::Bls12_381;
     use ark_bls12_381::Fr;
     use ark_ec::PairingEngine;
@@ -465,6 +591,7 @@ mod tests {
     type UniPoly_381 = DensePoly<<Bls12_381 as PairingEngine>::Fr>;
     type UniPoly_377 = DensePoly<<Bls12_377 as PairingEngine>::Fr>;
     type KZG_Bls12_381 = KZG10<Bls12_381, UniPoly_381>;
+    use ark_bls12_381::FrParameters as FrFft;
 
     impl<E: PairingEngine, P: UVPolynomial<E::Fr>> KZG10<E, P> {
         /// Specializes the public parameters for a given maximum degree `d` for polynomials
@@ -512,7 +639,7 @@ mod tests {
         f_p += (f, &p);
 
         let degree = 4;
-        let pp = KZG_Bls12_381::setup(degree, false, rng).unwrap();
+        let pp = KZG_Bls12_381::setup_with_lagrange::<_, FrFft>(degree, false, rng).unwrap();
         let (powers, _) = KZG_Bls12_381::trim(&pp, degree).unwrap();
 
         let hiding_bound = None;
