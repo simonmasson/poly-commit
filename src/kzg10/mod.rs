@@ -45,14 +45,11 @@ where
             return Err(Error::DegreeIsZero);
         }
         let setup_time = start_timer!(|| format!("KZG10::Setup with degree {}", max_degree));
-        // let beta = E::Fr::rand(rng);
-        let beta = E::Fr::from(12u32);
-        // let g = E::G1Projective::rand(rng);
-        let g = E::G1Projective::prime_subgroup_generator();
-        // let gamma_g = E::G1Projective::rand(rng);
-        let gamma_g = E::G1Projective::prime_subgroup_generator();
-        // let h = E::G2Projective::rand(rng);
-        let h = E::G2Projective::prime_subgroup_generator();
+        let beta = E::Fr::rand(rng);
+        let g = E::G1Projective::rand(rng);
+        // let g = E::G1Projective::prime_subgroup_generator();
+        let gamma_g = E::G1Projective::rand(rng);
+        let h = E::G2Projective::rand(rng);
 
         let mut powers_of_beta = vec![E::Fr::one()];
 
@@ -123,6 +120,7 @@ where
 
         end_timer!(neg_powers_of_h_time);
 
+        let g = g.into_affine();
         let h = h.into_affine();
         let beta_h = h.mul(beta).into_affine();
         let prepared_h = h.into();
@@ -131,6 +129,7 @@ where
         let pp = UniversalParams {
             powers_of_g,
             powers_of_gamma_g,
+            g,
             h,
             beta_h,
             neg_powers_of_h,
@@ -152,14 +151,11 @@ where
             return Err(Error::DegreeIsZero);
         }
         let setup_time = start_timer!(|| format!("KZG10::Setup with degree {}", max_degree));
-        // let β = E::Fr::rand(rng);
-        let β = E::Fr::from(12u32);
-        // let g = E::G1Projective::rand(rng);
-        let g = E::G1Projective::prime_subgroup_generator();
-        // let gamma_g = E::G1Projective::rand(rng);
-        let gamma_g = E::G1Projective::prime_subgroup_generator();
-        // let h = E::G2Projective::rand(rng);
-        let h = E::G2Projective::prime_subgroup_generator();
+        let β = E::Fr::rand(rng);
+        let g = E::G1Projective::rand(rng);
+        // let g = E::G1Projective::prime_subgroup_generator();
+        let gamma_g = E::G1Projective::rand(rng);
+        let h = E::G2Projective::rand(rng);
         let ω = E::Fr::get_root_of_unity(max_degree).unwrap();
 
         // num = prod_{i>=0} (β-ω^i)
@@ -251,6 +247,7 @@ where
 
         end_timer!(neg_powers_of_h_time);
 
+        let g = g.into_affine();
         let h = h.into_affine();
         let beta_h = h.mul(β).into_affine();
         let prepared_h = h.into();
@@ -259,6 +256,7 @@ where
         let pp = UniversalParams {
             powers_of_g,
             powers_of_gamma_g,
+            g,
             h,
             beta_h,
             neg_powers_of_h,
@@ -482,31 +480,6 @@ where
         Ok(lhs == rhs)
     }
 
-    /// Verifies that `value` is the evaluation at `point` of the polynomial
-    /// committed inside `comm`.
-    pub fn check_with_lagrange(
-        vk: &VerifierKey<E>,
-        comm: &Commitment<E>,
-        point: E::Fr,
-        value: E::Fr,
-        proof: &Proof<E>,
-    ) -> Result<bool, Error> {
-        let check_time = start_timer!(|| "Checking evaluation");
-        let mut inner =
-            comm.0.into_projective() - E::G1Affine::prime_subgroup_generator().mul(value);
-
-        if let Some(random_v) = proof.random_v {
-            inner -= &vk.gamma_g.mul(random_v);
-        }
-        let lhs = E::pairing(inner, vk.h);
-
-        let inner = vk.beta_h.into_projective() - &vk.h.mul(point);
-        let rhs = E::pairing(proof.w, inner);
-
-        end_timer!(check_time, || format!("Result: {}", lhs == rhs));
-        Ok(lhs == rhs)
-    }
-
     /// Check that each `proof_i` in `proofs` is a valid proof of evaluation for
     /// `commitment_i` at `point_i`.
     pub fn batch_check<R: RngCore>(
@@ -682,7 +655,7 @@ mod tests {
                 powers_of_gamma_g: ark_std::borrow::Cow::Owned(powers_of_gamma_g),
             };
             let vk = VerifierKey {
-                g: pp.powers_of_g[0],
+                g: pp.g,
                 gamma_g: pp.powers_of_gamma_g[&0],
                 h: pp.h,
                 beta_h: pp.beta_h,
@@ -709,7 +682,7 @@ mod tests {
         f_p += (f, &p);
 
         let degree = 4;
-        let pp = KZG_Bls12_381::setup_with_lagrange::<_, FrFft>(degree, false, rng).unwrap();
+        let pp = KZG_Bls12_381::setup(degree, false, rng).unwrap();
         let (powers, _) = KZG_Bls12_381::trim(&pp, degree).unwrap();
 
         let hiding_bound = None;
@@ -727,10 +700,10 @@ mod tests {
         // Of course, it requires having the same β and g in the setup...
         let rng = &mut test_rng();
         let p = DensePoly::from_coefficients_slice(&[
-            Fr::from(1u32), //rand(rng),
-            Fr::from(2u32), //rand(rng),
-            Fr::from(3u32), //rand(rng),
-            Fr::from(4u32), //rand(rng),
+            Fr::rand(rng),
+            Fr::rand(rng),
+            Fr::rand(rng),
+            Fr::rand(rng),
         ]);
 
         let domain = GeneralEvaluationDomain::<Fr>::new(p.degree() + 1).unwrap();
@@ -740,13 +713,15 @@ mod tests {
         let degree = 4;
         let hiding_bound = None;
 
-        let pp1 = KZG_Bls12_381::setup(degree, false, rng).unwrap();
+        let rng1 = &mut test_rng();
+        let pp1 = KZG_Bls12_381::setup(degree, false, rng1).unwrap();
         let (powers1, _) = KZG_Bls12_381::trim(&pp1, degree).unwrap();
-        let (comm1, _) = KZG10::commit(&powers1, &p, hiding_bound, Some(rng)).unwrap();
+        let (comm1, _) = KZG10::commit(&powers1, &p, hiding_bound, Some(rng1)).unwrap();
 
-        let pp2 = KZG_Bls12_381::setup_with_lagrange::<_, FrFft>(degree, false, rng).unwrap();
+        let rng2 = &mut test_rng();
+        let pp2 = KZG_Bls12_381::setup_with_lagrange::<_, FrFft>(degree, false, rng2).unwrap();
         let (powers2, _) = KZG_Bls12_381::trim(&pp2, degree).unwrap();
-        let (comm2, _) = KZG10::commit(&powers2, &p_lagrange, hiding_bound, Some(rng)).unwrap();
+        let (comm2, _) = KZG10::commit(&powers2, &p_lagrange, hiding_bound, Some(rng2)).unwrap();
 
         assert_eq!(comm1.0, comm2.0);
     }
@@ -757,34 +732,34 @@ mod tests {
         // Of course, it requires having the same β and g in the setup...
         let rng = &mut test_rng();
         let p = DensePoly::from_coefficients_slice(&[
-            Fr::from(1u32),
-            Fr::from(2u32),
-            Fr::from(3u32),
-            Fr::from(4u32),
+            Fr::rand(rng),
+            Fr::rand(rng),
+            Fr::rand(rng),
+            Fr::rand(rng),
         ]);
-
         let domain = GeneralEvaluationDomain::<Fr>::new(p.degree() + 1).unwrap();
-
         let p_lagrange = DensePoly::from_coefficients_vec(domain.fft(p.coeffs()));
-
         let degree = 4;
         let hiding_bound = None;
 
-        let pp1 = KZG_Bls12_381::setup(degree, false, rng).unwrap();
+        let rng1 = &mut test_rng();
+        let pp1 = KZG_Bls12_381::setup(degree, false, rng1).unwrap();
         let (powers1, _) = KZG_Bls12_381::trim(&pp1, degree).unwrap();
-        let (comm1, rand1) = KZG10::commit(&powers1, &p, hiding_bound, Some(rng)).unwrap();
+        let (_comm1, rand1) = KZG10::commit(&powers1, &p, hiding_bound, Some(rng1)).unwrap();
         let point = Fr::from(123u32);
         let proof1 = KZG10::open(&powers1, &p, point, &rand1).unwrap();
 
-        let pp2 = KZG_Bls12_381::setup_with_lagrange::<_, FrFft>(degree, false, rng).unwrap();
+        let rng2 = &mut test_rng();
+        let pp2 = KZG_Bls12_381::setup_with_lagrange::<_, FrFft>(degree, false, rng2).unwrap();
         let (powers2, _) = KZG_Bls12_381::trim(&pp2, degree).unwrap();
-        let (comm2, rand2) = KZG10::commit(&powers2, &p_lagrange, hiding_bound, Some(rng)).unwrap();
+        let (_comm2, rand2) =
+            KZG10::commit(&powers2, &p_lagrange, hiding_bound, Some(rng2)).unwrap();
         let proof2 = KZG10::open_with_lagrange(&powers2, &p_lagrange, point, &rand2).unwrap();
         assert_eq!(proof1.w, proof2.w);
     }
 
     #[test]
-    fn test_verify_both() {
+    fn test_verify() {
         // We check that commiting with the lagrange basis or the canonical basis lead to the same value.
         // Of course, it requires having the same β and g in the setup...
         let rng = &mut test_rng();
@@ -802,10 +777,11 @@ mod tests {
         let degree = 4;
         let hiding_bound = None;
 
-        let pp1 = KZG_Bls12_381::setup(degree, false, rng).unwrap();
+        let rng1 = &mut test_rng();
+        let pp1 = KZG_Bls12_381::setup(degree, false, rng1).unwrap();
         let (powers1, vk1) = KZG_Bls12_381::trim(&pp1, degree).unwrap();
-        let (comm1, rand1) = KZG10::commit(&powers1, &p, hiding_bound, Some(rng)).unwrap();
-        let point = Fr::from(123u32);
+        let (comm1, rand1) = KZG10::commit(&powers1, &p, hiding_bound, Some(rng1)).unwrap();
+        let point = Fr::rand(rng1);
         let value = p.evaluate(&point);
         let proof1 = KZG10::open(&powers1, &p, point, &rand1).unwrap();
         assert!(
@@ -816,15 +792,16 @@ mod tests {
             hiding_bound,
         );
 
-        let pp2 = KZG_Bls12_381::setup_with_lagrange::<_, FrFft>(degree, false, rng).unwrap();
+        let rng2 = &mut test_rng();
+        let pp2 = KZG_Bls12_381::setup_with_lagrange::<_, FrFft>(degree, false, rng2).unwrap();
         let (powers2, vk2) = KZG_Bls12_381::trim(&pp2, degree).unwrap();
-        let (comm2, rand2) = KZG10::commit(&powers2, &p_lagrange, hiding_bound, Some(rng)).unwrap();
+        let (comm2, rand2) =
+            KZG10::commit(&powers2, &p_lagrange, hiding_bound, Some(rng2)).unwrap();
+        let point = Fr::rand(rng2);
+        let value = p.evaluate(&point);
         let proof2 = KZG10::open_with_lagrange(&powers2, &p_lagrange, point, &rand2).unwrap();
         assert!(
-            KZG10::<Bls12_381, UniPoly_381>::check_with_lagrange(
-                &vk2, &comm2, point, value, &proof2
-            )
-            .unwrap(),
+            KZG10::<Bls12_381, UniPoly_381>::check(&vk2, &comm2, point, value, &proof2).unwrap(),
             "proof was incorrect for max_degree = {}, polynomial_degree = {}, hiding_bound = {:?}",
             degree,
             p.degree(),
@@ -857,7 +834,7 @@ mod tests {
             let value = p_can.evaluate(&point);
             let proof = KZG10::<E, P>::open_with_lagrange(&ck, &p, point, &rand)?;
             assert!(
-                KZG10::<E, P>::check_with_lagrange(&vk, &comm, point, value, &proof)?,
+                KZG10::<E, P>::check(&vk, &comm, point, value, &proof)?,
                 "proof was incorrect for max_degree = {}, polynomial_degree = {}, hiding_bound = {:?}",
                 degree,
                 p.degree(),
