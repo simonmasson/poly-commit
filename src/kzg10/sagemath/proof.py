@@ -12,26 +12,27 @@ class KZGProof():
         self.a = 0
         self.y = 0
 
-    def commit(self, phi, rand=0):
-        # the commit is [phi(tau)]G, computed using the trusted setup.
-        if isinstance(phi, list) :
-            coeffs = phi
+    def commit(self, φ, rand=0):
+        # the commit is [φ(tau)]G, computed using the trusted setup.
+        if isinstance(φ, list) :
+            coeffs = φ
         else:
-            coeffs = phi.list()
+            coeffs = φ.list()
         assert len(coeffs) <= len(self.trusted_setup) - 2
         self.C = 0
         for i in range(len(coeffs)):
             self.C += int(coeffs[i]) * self.trusted_setup[i]
         return self.C
 
-    def open(self, phi, a, rand=0):
+    def open(self, φ, a, rand=0):
         # computes a quotient polynomial and create the proof using
         # the trusted setup.
-        y = phi(a)
-        X = phi.parent().gen()
-        q = (phi - y) // (X-a)
-        coeffs = q.list()   
-        assert len(coeffs) <= len(self.trusted_setup) - 2
+        y = φ(a)
+        X = φ.parent().gen()
+        q = (φ - y) // (X-a)
+        coeffs = q.list()
+
+        # assert len(coeffs) <= len(self.trusted_setup) - 2
         self.proof = 0
         for i in range(len(coeffs)):
             self.proof += int(coeffs[i]) * self.trusted_setup[i]
@@ -39,18 +40,19 @@ class KZGProof():
         self.y = y
         return [self.y, self.proof]
 
-    def open_lag(self, phi, a, lagrange_polys, lagrange_polys_small, X, ω, mat_inv):
+    def open_lag(self, φ, a, FX, M, M_inv):
         # computes a quotient polynomial and create the proof using
         # the trusted setup.
 
-        phi_x = mat_inv.inverse()*vector(phi)
-        y = sum([phi_x[i]*a**i for i in range(len(phi))])
-        coeffs = [(phi[i]-y)/(ω**i - a) for i in range(len(phi)-1)]
-                
+        φ_can = FX((M*vector(φ)).list())
+        Q, R = φ_can.quo_rem(FX([-a,1]))
+        y = R.list()[0]
+        coeffs = M_inv * vector(Q.list() + [0])
+
         assert len(coeffs) <= len(self.trusted_setup) - 2
         self.proof = 0
         for i in range(len(coeffs)):
-            self.proof += int(coeffs[i]) * self.trusted_setup[i+len(phi)]
+            self.proof += int(coeffs[i]) * self.trusted_setup[i]
         self.a = a
         self.y = y
         return [self.y, self.proof]
