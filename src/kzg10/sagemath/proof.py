@@ -39,25 +39,18 @@ class KZGProof():
         self.y = y
         return [self.y, self.proof]
 
-    def open_lag(self, phi, a, X, mat_inv):
+    def open_lag(self, phi, a, lagrange_polys, lagrange_polys_small, X, ω, mat_inv):
         # computes a quotient polynomial and create the proof using
         # the trusted setup.
 
-        # conversion in canonical basis
-        phi_x = mat_inv.inverse() * vector(phi)
-        # y = phi_x(a)
-        y = sum([phi_x[i] * a**i for i in range(len(phi_x))])
-        # q = (phi_x - y) / (X-a)
-        q = (sum([phi_x[i] * X**i for i in range(len(phi))]) - y) // (X - a)
-        vq = q.list()
-        while len(vq)!= len(mat_inv.columns()):
-            vq = vq + [0]
-        coeffs = mat_inv * vector(vq)
-
+        phi_x = mat_inv.inverse()*vector(phi)
+        y = sum([phi_x[i]*a**i for i in range(len(phi))])
+        coeffs = [(phi[i]-y)/(ω**i - a) for i in range(len(phi)-1)]
+                
         assert len(coeffs) <= len(self.trusted_setup) - 2
         self.proof = 0
         for i in range(len(coeffs)):
-            self.proof += int(coeffs[i]) * self.trusted_setup[i]
+            self.proof += int(coeffs[i]) * self.trusted_setup[i+len(phi)]
         self.a = a
         self.y = y
         return [self.y, self.proof]

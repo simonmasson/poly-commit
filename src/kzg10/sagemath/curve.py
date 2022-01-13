@@ -54,12 +54,13 @@ class Degree12PairingCurve():
                 polFq6 = Z**6 - beta
         self.beta = self.Fp2(beta)
 
-        orderE = self.E.order()
-        cof = self.E.order()//self.q
-        self.G1 = cof*self.E.random_point()
-        while self.G1 == 0:
-            self.G1 = cof*self.E.random_point()
-        assert self.G1!= 0 and self.q*self.G1==0
+        self.G1 = self.E(3685416753713387016781088315183077757961620795782546409894578378688607592378376318836054947676345821548104185464507, 1339506544944476473020471379941921221584933875938349620426543736416511423956333506472724655353366534992391756441569)
+        # orderE = self.E.order()
+        # cof = self.E.order()//self.q
+        # self.G1 = cof*self.E.random_point()
+        # while self.G1 == 0:
+        #     self.G1 = cof*self.E.random_point()
+        # assert self.G1!= 0 and self.q*self.G1==0
 
         self.E2 = self.E.change_ring(self.Fp2)
 
