@@ -47,10 +47,20 @@ for i in range(n):
         M[j,i] = Li[j]
 M_inv = M.inverse()
 
+def evaluate_lag(φ_lag, a):
+    # evaluate a polynomial φ given in Lagrange representation, at a using the barycentric formula
+    n = len(φ_lag)
+    res = 0
+    pow_ω = Ebls.Fq(1)
+    for i in range(len(φ_lag)):
+        res += φ_lag[i] * pow_ω / (pow_ω-a)
+        pow_ω *= ω
+    assert pow_ω == 1
+    return res * (1-a**n)/n
+
 ###
 
-# s = Ebls.Fq.random_element()
-s = Ebls.Fq(12)
+s = Ebls.Fq.random_element()
 trusted_setup = [int(s**i)*Ebls.G1 for i in range(1<<k)] + [Ebls.G2,int(s)*Ebls.G2]
 
 P = KZGProof(trusted_setup, Ebls)
@@ -58,8 +68,7 @@ P = KZGProof(trusted_setup, Ebls)
 # φ = Ebls.FqX([Ebls.Fq.random_element() for i in range(1<<k)])
 P.commit(φ)
 
-# a = Ebls.Fq.random_element()
-a = Ebls.Fq(123)
+a = Ebls.Fq.random_element()
 y = φ(a)
 P.open(φ, a)
 assert P.verify()
@@ -68,26 +77,15 @@ assert P.verify()
 
 setup = [int(lagrange_poly(i, n)(s)) * Ebls.G1 for i in range(n)]
 
-print('setup')
-for point in setup:
-    print(hex(point[0]))
-    print(hex(point[1]))
-    print()
+
 
 φ_can = φ.list()
 φ_lag = M_inv * vector(φ_can)
-for coeff in φ_lag:
-    print(hex(coeff))
 
 P = KZGProof(setup+ [Ebls.G2,int(s)*Ebls.G2], Ebls)
 P.commit(φ_lag)
-print('commit')
-print(hex(P.C[0]))
-print(hex(P.C[1]))
 
 y = sum([φ_lag[i] * lagrange_poly(i)(a) for i in range(n)])
 P.open_lag(φ_lag, a, FX, M, M_inv)
-print('proof')
-print(hex(P.proof[0]))
-print(hex(P.proof[1]))
+
 assert P.verify()
