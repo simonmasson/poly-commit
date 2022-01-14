@@ -40,7 +40,7 @@ class KZGProof():
         self.y = y
         return [self.y, self.proof]
 
-    def open_lag(self, φ, a, FX, M, M_inv, ω):
+    def open_lag(self, φ, a, ω):
         # computes a quotient polynomial and create the proof using
         # the trusted setup.
 
@@ -65,7 +65,7 @@ class KZGProof():
     def verify(self):
         C = self.curve.Ek(self.C)
         pi = self.curve.Ek(self.proof)
-        G1 = self.curve.Ek(self.curve.G1)
+        G1 = self.curve.Ek(self.trusted_setup[-3])
         G2 = self.trusted_setup[-2]
         tauG2 = self.trusted_setup[-1]
         return (C - int(self.y)*G1).tate_pairing(G2, self.curve.q, 12)\
