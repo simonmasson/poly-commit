@@ -724,7 +724,7 @@ mod tests {
         let pp1 = KZG_Bls12_381::setup(degree, false, rng1).unwrap();
         let (powers1, _) = KZG_Bls12_381::trim(&pp1, degree).unwrap();
         let (_comm1, rand1) = KZG10::commit(&powers1, &p, hiding_bound, Some(rng1)).unwrap();
-        let point = Fr::from(123u32);
+        let point = Fr::rand(rng1);
         let proof1 = KZG10::open(&powers1, &p, point, &rand1).unwrap();
 
         let rng2 = &mut test_rng();
