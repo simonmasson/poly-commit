@@ -8,7 +8,7 @@
 use crate::{BTreeMap, Error, LabeledPolynomial, PCRandomness, ToString, Vec};
 use ark_ec::msm::{FixedBaseMSM, VariableBaseMSM};
 use ark_ec::{group::Group, AffineCurve, PairingEngine, ProjectiveCurve};
-use ark_ff::{FftField, FftParameters, One, PrimeField, UniformRand, Zero};
+use ark_ff::{FftField, FftParameters, One, PrimeField, UniformRand, Zero, Field};
 use ark_poly::{EvaluationDomain, GeneralEvaluationDomain, UVPolynomial};
 use ark_std::{format, marker::PhantomData, ops::Div, vec};
 
@@ -158,32 +158,14 @@ where
         let h = E::G2Projective::rand(rng);
         let ω = E::Fr::get_root_of_unity(max_degree).unwrap();
 
-        // num = prod_{i>=0} (β-ω^i)
-        // den = prod_{i>0}  (1-ω^i)
-        // ω_n_minus_1 = ω^{n-1}
-        let mut num = E::Fr::one();
-        let mut den = E::Fr::one();
-        let mut pow_ω = E::Fr::one();
-        let mut ω_n_minus_1 = E::Fr::one();
-        for i in 0..max_degree {
-            num *= β - pow_ω;
-            if i > 0 {
-                den *= E::Fr::one() - pow_ω;
-            }
-            if i == max_degree - 1 {
-                ω_n_minus_1 = pow_ω;
-            }
-            pow_ω *= ω;
-        }
-        // create the [L_0(β), ..., L_n(β)]
+        // We create the [L_0(β), ..., L_n(β)]
+        let mut c = ( β.pow([max_degree as u64]) - E::Fr::one()) / E::Fr::from(max_degree as u32);
         let mut lagrange_polys_at_β = vec![];
-        let mut num_tmp;
-        // pow_ω = E::Fr::one();
+        let mut pow_ω = E::Fr::one();
         for _ in 0..max_degree + 1 {
-            num_tmp = num / (β - pow_ω);
-            lagrange_polys_at_β.push(num_tmp / den);
+            lagrange_polys_at_β.push(c / (β - pow_ω));
             pow_ω *= ω;
-            den *= ω_n_minus_1;
+            c *= ω;
         }
 
         let window_size = FixedBaseMSM::get_mul_window_size(max_degree + 1);
