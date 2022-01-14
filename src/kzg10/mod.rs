@@ -405,30 +405,29 @@ where
         powers: &Powers<E>,
         p: &P,
         point: P::Point,
+        value: P::Point,
         rand: &Randomness<E::Fr, P>,
     ) -> Result<Proof<E>, Error> {
         Self::check_degree_is_too_large(p.degree(), powers.size())?;
         let open_time = start_timer!(|| format!("Opening polynomial of degree {}", p.degree()));
 
+        // we compute the witness polynomial directly in Lagrange representation
         let witness_time = start_timer!(|| "Computing witness polynomials");
-
-        // representation of p in the canonical basis (1, X, ..., X^max_degree)
-
-        let domain = GeneralEvaluationDomain::<E::Fr>::new(p.degree()).unwrap();
-
-        let p_can = P::from_coefficients_vec(domain.ifft(p.coeffs()));
-        let (witness_poly, hiding_witness_poly) =
-            Self::compute_witness_polynomial(&p_can, point, rand)?;
+        let mut witness_poly_coeffs = vec![];
+        let mut pow_ω = E::Fr::one();
+        for i in 0..p.degree()+1 {
+            witness_poly_coeffs.push(((*p).coeffs()[i] - value) / (pow_ω - point));
+            pow_ω *= E::Fr::get_root_of_unity(p.degree()+1).unwrap();
+        }
+        let witness_poly = P::from_coefficients_vec(witness_poly_coeffs);
+        let hiding_witness_poly = None;
         end_timer!(witness_time);
-
-        // representation of witness_poly in the lagrange basis
-        let witness_poly_in_lagrange = P::from_coefficients_vec(domain.fft(witness_poly.coeffs()));
 
         let proof = Self::open_with_witness_polynomial(
             powers,
             point,
             rand,
-            &witness_poly_in_lagrange,
+            &witness_poly,
             hiding_witness_poly.as_ref(),
         );
 
@@ -733,7 +732,17 @@ mod tests {
         let (powers2, _) = KZG_Bls12_381::trim(&pp2, degree).unwrap();
         let (_comm2, rand2) =
             KZG10::commit(&powers2, &p_lagrange, hiding_bound, Some(rng2)).unwrap();
-        let proof2 = KZG10::open_with_lagrange(&powers2, &p_lagrange, point, &rand2).unwrap();
+        
+        // barycentric evaluation
+        let mut value = Fr::zero();
+        let mut pow_ω = Fr::one();
+        for i in 0..degree {
+            value += p_lagrange[i] * pow_ω / (pow_ω-point);
+            pow_ω *= Fr::get_root_of_unity(degree).unwrap();
+        }
+        value *= (Fr::one()-point.pow([degree as u64]))/Fr::from(degree as u64);
+    
+        let proof2 = KZG10::open_with_lagrange(&powers2, &p_lagrange, point, value, &rand2).unwrap();
         assert_eq!(proof1.w, proof2.w);
     }
 
@@ -777,8 +786,15 @@ mod tests {
         let (comm2, rand2) =
             KZG10::commit(&powers2, &p_lagrange, hiding_bound, Some(rng2)).unwrap();
         let point = Fr::rand(rng2);
-        let value = p.evaluate(&point);
-        let proof2 = KZG10::open_with_lagrange(&powers2, &p_lagrange, point, &rand2).unwrap();
+        // barycentric evaluation
+        let mut value = Fr::zero();
+        let mut pow_ω = Fr::one();
+        for i in 0..degree {
+            value += p_lagrange[i] * pow_ω / (pow_ω-point);
+            pow_ω *= Fr::get_root_of_unity(degree).unwrap();
+        }
+        value *= (Fr::one()-point.pow([degree as u64]))/Fr::from(degree as u64);
+        let proof2 = KZG10::open_with_lagrange(&powers2, &p_lagrange, point, value, &rand2).unwrap();
         assert!(
             KZG10::<Bls12_381, UniPoly_381>::check(&vk2, &comm2, point, value, &proof2).unwrap(),
             "proof was incorrect for max_degree = {}, polynomial_degree = {}, hiding_bound = {:?}",
