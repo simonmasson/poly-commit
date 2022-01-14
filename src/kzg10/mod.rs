@@ -8,7 +8,7 @@
 use crate::{BTreeMap, Error, LabeledPolynomial, PCRandomness, ToString, Vec};
 use ark_ec::msm::{FixedBaseMSM, VariableBaseMSM};
 use ark_ec::{group::Group, AffineCurve, PairingEngine, ProjectiveCurve};
-use ark_ff::{FftField, FftParameters, One, PrimeField, UniformRand, Zero, Field};
+use ark_ff::{FftField, FftParameters, Field, One, PrimeField, UniformRand, Zero};
 use ark_poly::{EvaluationDomain, GeneralEvaluationDomain, UVPolynomial};
 use ark_std::{format, marker::PhantomData, ops::Div, vec};
 
@@ -157,7 +157,7 @@ where
         let ω = E::Fr::get_root_of_unity(max_degree).unwrap();
 
         // We create the [L_0(β), ..., L_n(β)]
-        let mut c = ( β.pow([max_degree as u64]) - E::Fr::one()) / E::Fr::from(max_degree as u32);
+        let mut c = (β.pow([max_degree as u64]) - E::Fr::one()) / E::Fr::from(max_degree as u32);
         let mut lagrange_polys_at_β = vec![];
         let mut pow_ω = E::Fr::one();
         for _ in 0..max_degree + 1 {
@@ -415,9 +415,9 @@ where
         let witness_time = start_timer!(|| "Computing witness polynomials");
         let mut witness_poly_coeffs = vec![];
         let mut pow_ω = E::Fr::one();
-        for i in 0..p.degree()+1 {
+        for i in 0..p.degree() + 1 {
             witness_poly_coeffs.push(((*p).coeffs()[i] - value) / (pow_ω - point));
-            pow_ω *= E::Fr::get_root_of_unity(p.degree()+1).unwrap();
+            pow_ω *= E::Fr::get_root_of_unity(p.degree() + 1).unwrap();
         }
         let witness_poly = P::from_coefficients_vec(witness_poly_coeffs);
         let hiding_witness_poly = None;
@@ -732,17 +732,18 @@ mod tests {
         let (powers2, _) = KZG_Bls12_381::trim(&pp2, degree).unwrap();
         let (_comm2, rand2) =
             KZG10::commit(&powers2, &p_lagrange, hiding_bound, Some(rng2)).unwrap();
-        
+
         // barycentric evaluation
         let mut value = Fr::zero();
         let mut pow_ω = Fr::one();
         for i in 0..degree {
-            value += p_lagrange[i] * pow_ω / (pow_ω-point);
+            value += p_lagrange[i] * pow_ω / (pow_ω - point);
             pow_ω *= Fr::get_root_of_unity(degree).unwrap();
         }
-        value *= (Fr::one()-point.pow([degree as u64]))/Fr::from(degree as u64);
-    
-        let proof2 = KZG10::open_with_lagrange(&powers2, &p_lagrange, point, value, &rand2).unwrap();
+        value *= (Fr::one() - point.pow([degree as u64])) / Fr::from(degree as u64);
+
+        let proof2 =
+            KZG10::open_with_lagrange(&powers2, &p_lagrange, point, value, &rand2).unwrap();
         assert_eq!(proof1.w, proof2.w);
     }
 
@@ -790,11 +791,12 @@ mod tests {
         let mut value = Fr::zero();
         let mut pow_ω = Fr::one();
         for i in 0..degree {
-            value += p_lagrange[i] * pow_ω / (pow_ω-point);
+            value += p_lagrange[i] * pow_ω / (pow_ω - point);
             pow_ω *= Fr::get_root_of_unity(degree).unwrap();
         }
-        value *= (Fr::one()-point.pow([degree as u64]))/Fr::from(degree as u64);
-        let proof2 = KZG10::open_with_lagrange(&powers2, &p_lagrange, point, value, &rand2).unwrap();
+        value *= (Fr::one() - point.pow([degree as u64])) / Fr::from(degree as u64);
+        let proof2 =
+            KZG10::open_with_lagrange(&powers2, &p_lagrange, point, value, &rand2).unwrap();
         assert!(
             KZG10::<Bls12_381, UniPoly_381>::check(&vk2, &comm2, point, value, &proof2).unwrap(),
             "proof was incorrect for max_degree = {}, polynomial_degree = {}, hiding_bound = {:?}",
