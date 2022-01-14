@@ -47,7 +47,6 @@ where
         let setup_time = start_timer!(|| format!("KZG10::Setup with degree {}", max_degree));
         let beta = E::Fr::rand(rng);
         let g = E::G1Projective::rand(rng);
-        // let g = E::G1Projective::prime_subgroup_generator();
         let gamma_g = E::G1Projective::rand(rng);
         let h = E::G2Projective::rand(rng);
 
@@ -153,7 +152,6 @@ where
         let setup_time = start_timer!(|| format!("KZG10::Setup with degree {}", max_degree));
         let β = E::Fr::rand(rng);
         let g = E::G1Projective::rand(rng);
-        // let g = E::G1Projective::prime_subgroup_generator();
         let gamma_g = E::G1Projective::rand(rng);
         let h = E::G2Projective::rand(rng);
         let ω = E::Fr::get_root_of_unity(max_degree).unwrap();
@@ -676,7 +674,7 @@ mod tests {
     }
 
     #[test]
-    fn test_commitment_equality() {
+    fn test_lagrange_commitment_consistency() {
         // We check that commiting with the lagrange basis or the canonical basis lead to the same value.
         // Of course, it requires having the same β and g in the setup...
         let rng = &mut test_rng();
@@ -708,7 +706,7 @@ mod tests {
     }
 
     #[test]
-    fn test_proof_equality() {
+    fn test_lagrange_proof_consistency() {
         // We check that commiting with the lagrange basis or the canonical basis lead to the same value.
         // Of course, it requires having the same β and g in the setup...
         let rng = &mut test_rng();
@@ -740,7 +738,7 @@ mod tests {
     }
 
     #[test]
-    fn test_verify() {
+    fn test_lagrange_verification() {
         // We check that commiting with the lagrange basis or the canonical basis lead to the same value.
         // Of course, it requires having the same β and g in the setup...
         let rng = &mut test_rng();
@@ -810,8 +808,6 @@ mod tests {
             let (comm, rand) = KZG10::<E, P>::commit(&ck, &p, hiding_bound, Some(rng))?;
 
             let point = E::Fr::rand(rng);
-            // let domain = GeneralEvaluationDomain::<E::Fr>::new(p.degree()).unwrap();
-            // let p_can = P::from_coefficients_vec(domain.ifft(p.coeffs()));
             let value = p.evaluate(&point);
             let proof = KZG10::<E, P>::open(&ck, &p, point, &rand)?;
             assert!(
