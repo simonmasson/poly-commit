@@ -75,17 +75,32 @@ assert P.verify()
 
 #######################################
 
-setup = [int(lagrange_poly(i, n)(s)) * Ebls.G1 for i in range(n)]
-
-
+setup = [int(lagrange_poly(i, n)(s)) * Ebls.G1 for i in range(n)] + [Ebls.G2,int(s)*Ebls.G2]
 
 φ_can = φ.list()
 φ_lag = M_inv * vector(φ_can)
 
-P = KZGProof(setup+ [Ebls.G2,int(s)*Ebls.G2], Ebls)
+P = KZGProof(setup, Ebls)
 P.commit(φ_lag)
 
 y = sum([φ_lag[i] * lagrange_poly(i)(a) for i in range(n)])
-P.open_lag(φ_lag, a, FX, M, M_inv)
+P.open_lag(φ_lag, a, FX, M, M_inv,ω)
 
 assert P.verify()
+
+###### test for optimizing the opening proof...
+
+φ = FX([1,2,3,4])
+z = Ebls.Fq(12)
+
+Q = (φ - φ(z))//(X-z)
+print(Q.list())
+
+φ_lag = M_inv*vector(φ.list())
+Q_lag = [(φ_lag[i]-φ(z)) / (ω**i-z) for i in range(3)]
+print(Q_lag)
+for i in range(4):
+    print(Q(ω**i))
+
+Q_can = M*vector(Q_lag + [Q(ω**3)])
+print(Q_can)
