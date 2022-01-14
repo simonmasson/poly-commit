@@ -44,29 +44,15 @@ class KZGProof():
         # computes a quotient polynomial and create the proof using
         # the trusted setup.
 
-        def evaluate_lag(φ_lag, a):
-            # evaluate a polynomial φ given in Lagrange representation, at a using the barycentric formula
-            n = len(φ_lag)
-            res = 0
-            pow_ω = a.parent()(1)
-            for i in range(len(φ_lag)):
-                res += φ_lag[i] * pow_ω / (pow_ω-a)
-                pow_ω *= ω
-            assert pow_ω == 1
-            return res * (1-a**n)/n
-
-
-        y = evaluate_lag(φ, a)
-        quotient = [(φ[i] - y)/(ω**i - a) for i in range(len(φ)-1)]
-        # last_eval = evaluate_lag(quotient, ω**(len(φ)))
-        # coeffs = quotient + [last_eval]
-        print(quotient)
-        
-        φ_can = FX((M*vector(φ)).list())
-        Q, R = φ_can.quo_rem(FX([-a,1]))
-        y = R.list()[0]
-        coeffs = M_inv * vector(Q.list() + [0])
-        print(coeffs)
+        # y = φ(a) is computed using the barycentric formula
+        n = len(φ)
+        res = 0
+        pow_ω = 1
+        for i in range(n):
+            res += φ[i] * pow_ω / (pow_ω-a)
+            pow_ω *= ω
+        y = res * (1-a**n)/n
+        coeffs = [(φ[i] - y)/(ω**i - a) for i in range(len(φ))]
 
         assert len(coeffs) <= len(self.trusted_setup) - 2
         self.proof = 0
