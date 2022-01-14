@@ -51,26 +51,19 @@ class KZGProof():
         # powers of ω could be precomputed
         elts = [ω**i - a for i in range(n)]
         # step 1
-        from sage.misc.misc_c import prod
         step_1 = [1]
         for j in range(n):
             step_1.append(step_1[-1] * elts[j])
-            assert step_1[j+1] == prod([elts[i] for i in range(j+1)])
         # step 2
         inv = 1/step_1[n]
-        assert inv == 1/ prod([elts[i] for i in range(n)])
-        assert inv * step_1[n-1] == 1/elts[-1]
         # step 3
         step_3 = [inv]
         for j in range(n-1, 0, -1):
             step_3 = [step_3[0] * elts[j]] + step_3
-        for i in range(n):
-            assert step_3[j] == 1/step_1[j+1]
         # step 4
         step_4 = []
         for j in range(n):
             step_4.append(step_1[j] * step_3[j])
-            assert step_4[j] == 1/elts[j]
         
         pow_ω = 1
         for i in range(n):
