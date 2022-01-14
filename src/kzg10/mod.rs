@@ -605,7 +605,6 @@ mod tests {
     use crate::*;
 
     use ark_bls12_377::Bls12_377;
-    // use ark_bls12_377::FrParameters;
     use ark_bls12_381::Bls12_381;
     use ark_bls12_381::Fr;
     use ark_ec::PairingEngine;
@@ -804,17 +803,17 @@ mod tests {
                 degree = usize::rand(rng) % 20;
             }
             degree = 16;
-            let pp = KZG10::<E, P>::setup_with_lagrange::<_, FrFft>(degree, false, rng)?;
+            let pp = KZG10::<E, P>::setup(degree, false, rng)?;
             let (ck, vk) = KZG10::<E, P>::trim(&pp, degree)?;
             let p = P::rand(degree - 1, rng);
             let hiding_bound = Some(1);
             let (comm, rand) = KZG10::<E, P>::commit(&ck, &p, hiding_bound, Some(rng))?;
 
             let point = E::Fr::rand(rng);
-            let domain = GeneralEvaluationDomain::<E::Fr>::new(p.degree()).unwrap();
-            let p_can = P::from_coefficients_vec(domain.ifft(p.coeffs()));
-            let value = p_can.evaluate(&point);
-            let proof = KZG10::<E, P>::open_with_lagrange(&ck, &p, point, &rand)?;
+            // let domain = GeneralEvaluationDomain::<E::Fr>::new(p.degree()).unwrap();
+            // let p_can = P::from_coefficients_vec(domain.ifft(p.coeffs()));
+            let value = p.evaluate(&point);
+            let proof = KZG10::<E, P>::open(&ck, &p, point, &rand)?;
             assert!(
                 KZG10::<E, P>::check(&vk, &comm, point, value, &proof)?,
                 "proof was incorrect for max_degree = {}, polynomial_degree = {}, hiding_bound = {:?}",
