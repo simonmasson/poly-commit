@@ -423,31 +423,30 @@ where
         let mut pow_ω = E::Fr::one();
         let ω = E::Fr::get_root_of_unity(p.degree() + 1).unwrap();
         let n = p.degree() + 1;
-        let mut elts = [E::Fr::one(); 4];
-        for i in 0..n {
-            elts[i] = pow_ω - point;
+        let mut elts = vec![];
+        for _ in 0..n {
+            elts.push(pow_ω - point);
             pow_ω *= ω;
         }
         // step 1
-        let mut step_1 = [E::Fr::one();4+1];
-        step_1[0] = E::Fr::one();
+        let mut step_1 = vec![E::Fr::one()];
         for j in 0..n {
-            step_1[j+1] = step_1[j] * elts[j];
+            step_1.push(step_1[j] * elts[j]);
         }
         // step 2
-        let inv = E::Fr::one()/step_1[n];
+        let inv = E::Fr::one() / step_1[n];
         // step 3
-        let mut step_3 = [E::Fr::one(); 4];
-        step_3[n-1] = inv;
+        let mut step_3 = vec![inv];//[E::Fr::one(); 4];
+        // step_3[n - 1] = inv;
         for j in (1..n).rev() {
-            step_3[j-1] = step_3[j] * elts[j];
+            step_3.push(step_3[n-1-j] * elts[j]);
         }
         // step 4
         let mut step_4 = [E::Fr::one(); 4];
         for j in 0..n {
-            step_4[j] = step_1[j] * step_3[j];
+            step_4[j] = step_1[j] * step_3[n-1-j];
         }
-        
+
         let mut witness_poly_coeffs = vec![];
         for i in 0..p.degree() + 1 {
             witness_poly_coeffs.push(((*p).coeffs()[i] - value) * step_4[i]);
