@@ -9,7 +9,7 @@ use crate::{BTreeMap, Error, LabeledPolynomial, PCRandomness, ToString, Vec};
 use ark_ec::msm::{FixedBaseMSM, VariableBaseMSM};
 use ark_ec::{group::Group, AffineCurve, PairingEngine, ProjectiveCurve};
 use ark_ff::{FftField, FftParameters, Field, One, PrimeField, UniformRand, Zero};
-use ark_poly::{EvaluationDomain, GeneralEvaluationDomain, UVPolynomial};
+use ark_poly::UVPolynomial;
 use ark_std::{format, marker::PhantomData, ops::Div, vec};
 
 use ark_std::rand::RngCore;
