@@ -413,11 +413,44 @@ where
 
         // we compute the witness polynomial directly in Lagrange representation
         let witness_time = start_timer!(|| "Computing witness polynomials");
-        let mut witness_poly_coeffs = vec![];
+        // batch computation for the inverses of the ω^i - point, with only one inversion.
+        // 0. ω**i - a                      for 0 <= i <= n-1
+        // 1. prod_{j=0}^{i-1} (ω**j - a)   for 0 <= i <= n-1
+        // 2. 1/prod_{j=0}^{n-1} (ω**j - a)
+        // 3. 1/prod_{j=0}^{i-1} (ω**j - a) for 0 <= i <= n-1
+        // 4. the inverses of the ω**i - a.
+        // step 0
         let mut pow_ω = E::Fr::one();
+        let ω = E::Fr::get_root_of_unity(p.degree() + 1).unwrap();
+        let n = p.degree() + 1;
+        let mut elts = [E::Fr::one(); 4];
+        for i in 0..n {
+            elts[i] = pow_ω - point;
+            pow_ω *= ω;
+        }
+        // step 1
+        let mut step_1 = [E::Fr::one();4+1];
+        step_1[0] = E::Fr::one();
+        for j in 0..n {
+            step_1[j+1] = step_1[j] * elts[j];
+        }
+        // step 2
+        let inv = E::Fr::one()/step_1[n];
+        // step 3
+        let mut step_3 = [E::Fr::one(); 4];
+        step_3[n-1] = inv;
+        for j in (1..n).rev() {
+            step_3[j-1] = step_3[j] * elts[j];
+        }
+        // step 4
+        let mut step_4 = [E::Fr::one(); 4];
+        for j in 0..n {
+            step_4[j] = step_1[j] * step_3[j];
+        }
+        
+        let mut witness_poly_coeffs = vec![];
         for i in 0..p.degree() + 1 {
-            witness_poly_coeffs.push(((*p).coeffs()[i] - value) / (pow_ω - point));
-            pow_ω *= E::Fr::get_root_of_unity(p.degree() + 1).unwrap();
+            witness_poly_coeffs.push(((*p).coeffs()[i] - value) * step_4[i]);
         }
         let witness_poly = P::from_coefficients_vec(witness_poly_coeffs);
         let hiding_witness_poly = None;
