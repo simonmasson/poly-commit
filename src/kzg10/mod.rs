@@ -637,6 +637,7 @@ mod tests {
     use ark_bls12_381::Bls12_381;
     use ark_bls12_381::Fr;
     use ark_ec::PairingEngine;
+    use ark_poly::{GeneralEvaluationDomain, EvaluationDomain};
     use ark_poly::univariate::DensePolynomial as DensePoly;
     use ark_std::test_rng;
 
