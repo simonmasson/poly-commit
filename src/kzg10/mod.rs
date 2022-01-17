@@ -425,36 +425,26 @@ where
         let n = powers.size()-1;
         let ω = E::Fr::get_root_of_unity(n).unwrap();
         let mut elts = vec![];
-        // println!("0");
-        for i in 0..n {
+        for _ in 0..n {
             elts.push(pow_ω - point);
-            // println!("{}", elts[i]);
             pow_ω *= ω;
         }
         // step 1
         let mut step_1 = vec![E::Fr::one()];
-        // println!("1");
         for j in 0..n {
             step_1.push(step_1[j] * elts[j]);
-            // println!("{}", step_1[j] * elts[j]);
         }
         // step 2
         let inv = E::Fr::one() / step_1[n];
-        // println!("{}", inv);
         // step 3
-        let mut step_3 = vec![inv];//[E::Fr::one(); 4];
-        // step_3[n - 1] = inv;
-        // println!("3");
+        let mut step_3 = vec![inv];
         for j in (1..n).rev() {
             step_3.push(step_3[n-1-j] * elts[j]);
-            // println!("{}", step_3[n-1-j]  * elts[j]);
         }
         // step 4
-        // println!("4");
-        let mut step_4 = vec![];//[E::Fr::one(); n];
+        let mut step_4 = vec![];
         for j in 0..n {
             step_4.push(step_1[j] * step_3[n-1-j]);
-            // println!("{}", step_1[j] * step_3[n-1-j]);
         }
 
         // value = p(point)
@@ -466,7 +456,7 @@ where
         for i in 0..p.degree()+1 {
             p_coeffs.push(p.coeffs()[i]);
         }
-        for i in (p.degree()+1)..n {
+        for _ in (p.degree()+1)..n {
             p_coeffs.push(E::Fr::zero());
         }
         let mut value = E::Fr::zero();
@@ -476,12 +466,10 @@ where
             pow_ω *= ω;
         }
         value *= (E::Fr::one() - point.pow([(powers.size()-1) as u64])) / E::Fr::from((powers.size()-1) as u64);
-        // println!("value = {}", value);
 
         let mut witness_poly_coeffs = vec![];
         for i in 0..n {
             witness_poly_coeffs.push((p_coeffs[i] - value) * step_4[i]);
-            // println!("wit={}", (p_coeffs[i] - value) * step_4[i]);
         }
         let witness_poly = P::from_coefficients_vec(witness_poly_coeffs);
         let hiding_witness_poly = None;
@@ -511,7 +499,6 @@ where
     ) -> Result<bool, Error> {
         let check_time = start_timer!(|| "Checking evaluation");
         let mut inner = comm.0.into_projective() - &vk.g.mul(value);
-        // println!("{}", inner);
 
         if let Some(random_v) = proof.random_v {
             inner -= &vk.gamma_g.mul(random_v);
@@ -894,11 +881,9 @@ mod tests {
             pow_ω *= Fr::get_root_of_unity(degree).unwrap();
         }
         value *= (Fr::one() - point.pow([degree as u64])) / Fr::from(degree as u64);
-        // println!("valeu = {}", value);
         
         let proof =
             KZG10::open_with_lagrange(&powers, &p, point, &rand).unwrap();
-        // println!("proof={}",proof.w);
         
         // verification
         assert!(
