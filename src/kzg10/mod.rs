@@ -8,7 +8,7 @@
 use crate::{BTreeMap, Error, LabeledPolynomial, PCRandomness, ToString, Vec};
 use ark_ec::msm::{FixedBaseMSM, VariableBaseMSM};
 use ark_ec::{group::Group, AffineCurve, PairingEngine, ProjectiveCurve};
-use ark_ff::{FftField, FftParameters, Field, One, PrimeField, UniformRand, Zero};
+use ark_ff::{FftField, Field, One, PrimeField, UniformRand, Zero};
 use ark_poly::UVPolynomial;
 use ark_std::{format, marker::PhantomData, ops::Div, vec};
 
@@ -141,7 +141,7 @@ where
 
     /// Constructs public parameters when given as input the maximum degree `degree`
     /// for the polynomial commitment scheme.
-    pub fn setup_with_lagrange<R: RngCore, FrParams: FftParameters>(
+    pub fn setup_with_lagrange<R: RngCore>(
         max_degree: usize,
         produce_g2_powers: bool,
         rng: &mut R,
@@ -644,8 +644,7 @@ mod tests {
     type UniPoly_381 = DensePoly<<Bls12_381 as PairingEngine>::Fr>;
     type UniPoly_377 = DensePoly<<Bls12_377 as PairingEngine>::Fr>;
     type KZG_Bls12_381 = KZG10<Bls12_381, UniPoly_381>;
-    use ark_bls12_381::FrParameters as FrFft;
-
+    
     impl<E: PairingEngine, P: UVPolynomial<E::Fr>> KZG10<E, P> {
         /// Specializes the public parameters for a given maximum degree `d` for polynomials
         /// `d` should be less that `pp.max_degree()`.
@@ -730,7 +729,7 @@ mod tests {
         let (comm1, _) = KZG10::commit(&powers1, &p, hiding_bound, Some(rng1)).unwrap();
 
         let rng2 = &mut test_rng();
-        let pp2 = KZG_Bls12_381::setup_with_lagrange::<_, FrFft>(degree, false, rng2).unwrap();
+        let pp2 = KZG_Bls12_381::setup_with_lagrange::<_>(degree, false, rng2).unwrap();
         let (powers2, _) = KZG_Bls12_381::trim(&pp2, degree).unwrap();
         let (comm2, _) = KZG10::commit(&powers2, &p_lagrange, hiding_bound, Some(rng2)).unwrap();
 
@@ -761,7 +760,7 @@ mod tests {
         let proof1 = KZG10::open(&powers1, &p, point, &rand1).unwrap();
 
         let rng2 = &mut test_rng();
-        let pp2 = KZG_Bls12_381::setup_with_lagrange::<_, FrFft>(degree, false, rng2).unwrap();
+        let pp2 = KZG_Bls12_381::setup_with_lagrange::<_>(degree, false, rng2).unwrap();
         let (powers2, _) = KZG_Bls12_381::trim(&pp2, degree).unwrap();
         let (_comm2, rand2) =
             KZG10::commit(&powers2, &p_lagrange, hiding_bound, Some(rng2)).unwrap();
@@ -815,7 +814,7 @@ mod tests {
         );
 
         let rng2 = &mut test_rng();
-        let pp2 = KZG_Bls12_381::setup_with_lagrange::<_, FrFft>(degree, false, rng2).unwrap();
+        let pp2 = KZG_Bls12_381::setup_with_lagrange::<_>(degree, false, rng2).unwrap();
         let (powers2, vk2) = KZG_Bls12_381::trim(&pp2, degree).unwrap();
         let (comm2, rand2) =
             KZG10::commit(&powers2, &p_lagrange, hiding_bound, Some(rng2)).unwrap();
