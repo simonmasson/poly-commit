@@ -71,7 +71,7 @@ class KZGProof():
             pow_ω *= ω
         y = res * (1-a**n)/n
         coeffs = [(φ[i] - y)/(ω**i - a) for i in range(len(φ))]
-
+        
         assert len(coeffs) <= len(self.trusted_setup) - 2
         self.proof = 0
         for i in range(len(coeffs)):
