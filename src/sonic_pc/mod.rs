@@ -151,7 +151,7 @@ where
         _: Option<usize>,
         rng: &mut R,
     ) -> Result<Self::UniversalParams, Self::Error> {
-        kzg10::KZG10::<E, P>::setup(max_degree, true, rng).map_err(Into::into)
+        kzg10::KZG10::<E, P>::setup_with_lagrange(max_degree, true, rng).map_err(Into::into)
     }
 
     fn trim(
@@ -356,7 +356,7 @@ where
 
         let mut curr_challenge = opening_challenges(opening_challenge_counter);
         opening_challenge_counter += 1;
-
+        
         for (polynomial, rand) in labeled_polynomials.into_iter().zip(rands) {
             let enforced_degree_bounds: Option<&[usize]> = ck
                 .enforced_degree_bounds
@@ -377,8 +377,11 @@ where
         }
 
         let proof_time = start_timer!(|| "Creating proof for polynomials");
-        let proof = kzg10::KZG10::open(&ck.powers(), &combined_polynomial, *point, &combined_rand)?;
+
+        println!("opening");
+        let proof = kzg10::KZG10::open_with_lagrange(&ck.powers(), &combined_polynomial, *point, &combined_rand)?;
         end_timer!(proof_time);
+        println!("deon");
 
         Ok(proof)
     }
