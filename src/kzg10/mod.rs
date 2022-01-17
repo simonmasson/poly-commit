@@ -154,6 +154,7 @@ where
         let g = E::G1Projective::rand(rng);
         let gamma_g = E::G1Projective::rand(rng);
         let h = E::G2Projective::rand(rng);
+        println!("{}", max_degree);
         let ω = E::Fr::get_root_of_unity(max_degree).unwrap();
 
         // We create the [L_0(β), ..., L_n(β)]
@@ -420,8 +421,9 @@ where
         // 4. the inverses of the ω**i - a.
         // step 0
         let mut pow_ω = E::Fr::one();
-        let ω = E::Fr::get_root_of_unity(p.degree() + 1).unwrap();
+        // println!("{}", (*powers).size());
         let n = p.degree() + 1;
+        let ω = E::Fr::get_root_of_unity(p.degree() + 1).unwrap();
         let mut elts = vec![];
         for _ in 0..n {
             elts.push(pow_ω - point);
@@ -456,7 +458,7 @@ where
             pow_ω *= ω;
         }
         value *= (E::Fr::one() - point.pow([n as u64])) / E::Fr::from(n as u64);
-
+        println!("value in opening = {}",value);
 
         let mut witness_poly_coeffs = vec![];
         for i in 0..p.degree() + 1 {
@@ -489,6 +491,7 @@ where
     ) -> Result<bool, Error> {
         let check_time = start_timer!(|| "Checking evaluation");
         let mut inner = comm.0.into_projective() - &vk.g.mul(value);
+        println!("{}", inner);
 
         if let Some(random_v) = proof.random_v {
             inner -= &vk.gamma_g.mul(random_v);
@@ -833,6 +836,77 @@ mod tests {
             KZG10::open_with_lagrange(&powers2, &p_lagrange, point, &rand2).unwrap();
         assert!(
             KZG10::<Bls12_381, UniPoly_381>::check(&vk2, &comm2, point, value, &proof2).unwrap(),
+            "proof was incorrect for max_degree = {}, polynomial_degree = {}, hiding_bound = {:?}",
+            degree,
+            p.degree(),
+            hiding_bound,
+        );
+    }
+
+    #[test]
+    fn test_lagrange_verification_smaller_degree() {
+        // We check that commiting with the lagrange basis or the canonical basis lead to the same value.
+        // Of course, it requires having the same β and g in the setup...
+        let rng = &mut test_rng();
+        let p = DensePoly::from_coefficients_slice(&[
+            Fr::from(1u32),
+            Fr::from(2u32),
+            Fr::from(3u32),
+            Fr::from(4u32),
+        ]);
+
+        let p2 = DensePoly::from_coefficients_slice(&[
+            Fr::from(1u32),
+            Fr::from(2u32),
+            Fr::from(3u32),
+            Fr::from(4u32),
+            Fr::from(0u32),
+            Fr::from(0u32),
+            Fr::from(0u32),
+            Fr::from(0u32),
+        ]);
+        
+        let degree = 4;
+        let hiding_bound = None;
+
+        let rng2 = &mut test_rng();
+        let pp2 = KZG_Bls12_381::setup_with_lagrange::<_>(2*degree, false, rng2).unwrap();
+        let (powers2, vk2) = KZG_Bls12_381::trim(&pp2, degree).unwrap();
+        // commit 
+        let (comm2, rand2) =
+            KZG10::commit(&powers2, &p, hiding_bound, Some(rng2)).unwrap();
+        let (comm2bis, _) =
+        KZG10::commit(&powers2, &p2, hiding_bound, Some(rng2)).unwrap();
+        assert_eq!(comm2, comm2bis);
+        
+        // opening
+        let point = Fr::rand(rng2);
+        // barycentric evaluation
+        let mut value = Fr::zero();
+        let mut pow_ω = Fr::one();
+        for i in 0..p.degree()+1 {
+            value += p[i] * pow_ω / (pow_ω - point);
+            pow_ω *= Fr::get_root_of_unity(degree).unwrap();
+        }
+        value *= (Fr::one() - point.pow([degree as u64])) / Fr::from(degree as u64);
+        println!("value={}",value);
+        let proof2 =
+            KZG10::open_with_lagrange(&powers2, &p, point, &rand2).unwrap();
+
+        value = Fr::zero();
+        pow_ω = Fr::one();
+        for i in 0..p2.degree()+1 {
+            value += p2[i] * pow_ω / (pow_ω - point);
+            pow_ω *= Fr::get_root_of_unity(degree).unwrap();
+        }
+        value *= (Fr::one() - point.pow([(p2.degree()+1) as u64])) / Fr::from((p2.degree()+1) as u64);
+        println!("value={}",value);
+        let proof22 =
+            KZG10::open_with_lagrange(&powers2, &p2, point, &rand2).unwrap();
+        
+        // verification
+        assert!(
+            KZG10::<Bls12_381, UniPoly_381>::check(&vk2, &comm2, point, value, &proof22).unwrap(),
             "proof was incorrect for max_degree = {}, polynomial_degree = {}, hiding_bound = {:?}",
             degree,
             p.degree(),
