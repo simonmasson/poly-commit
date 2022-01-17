@@ -154,7 +154,6 @@ where
         let g = E::G1Projective::rand(rng);
         let gamma_g = E::G1Projective::rand(rng);
         let h = E::G2Projective::rand(rng);
-        println!("{}", max_degree);
         let ω = E::Fr::get_root_of_unity(max_degree).unwrap();
 
         // We create the [L_0(β), ..., L_n(β)]
@@ -351,6 +350,7 @@ where
         end_timer!(witness_comm_time);
 
         let random_v = if let Some(hiding_witness_polynomial) = hiding_witness_polynomial {
+
             let blinding_p = &randomness.blinding_polynomial;
             let blinding_eval_time = start_timer!(|| "Evaluating random polynomial");
             let blinding_evaluation = blinding_p.evaluate(&point);
@@ -421,52 +421,72 @@ where
         // 4. the inverses of the ω**i - a.
         // step 0
         let mut pow_ω = E::Fr::one();
-        // println!("{}", (*powers).size());
-        let n = p.degree() + 1;
-        let ω = E::Fr::get_root_of_unity(p.degree() + 1).unwrap();
+        // n from the powers, not from the polynomial that can be smaller!
+        let n = powers.size()-1;
+        let ω = E::Fr::get_root_of_unity(n).unwrap();
         let mut elts = vec![];
-        for _ in 0..n {
+        // println!("0");
+        for i in 0..n {
             elts.push(pow_ω - point);
+            // println!("{}", elts[i]);
             pow_ω *= ω;
         }
         // step 1
         let mut step_1 = vec![E::Fr::one()];
+        // println!("1");
         for j in 0..n {
             step_1.push(step_1[j] * elts[j]);
+            // println!("{}", step_1[j] * elts[j]);
         }
         // step 2
         let inv = E::Fr::one() / step_1[n];
+        // println!("{}", inv);
         // step 3
         let mut step_3 = vec![inv];//[E::Fr::one(); 4];
         // step_3[n - 1] = inv;
+        // println!("3");
         for j in (1..n).rev() {
             step_3.push(step_3[n-1-j] * elts[j]);
+            // println!("{}", step_3[n-1-j]  * elts[j]);
         }
         // step 4
-        let mut step_4 = [E::Fr::one(); 4];
+        // println!("4");
+        let mut step_4 = vec![];//[E::Fr::one(); n];
         for j in 0..n {
-            step_4[j] = step_1[j] * step_3[n-1-j];
+            step_4.push(step_1[j] * step_3[n-1-j]);
+            // println!("{}", step_1[j] * step_3[n-1-j]);
         }
 
         // value = p(point)
         // TODO this needs to be computed for the verification.
         // Currently, computed twice...
+
+        // WARNING THIS IS DANGEROUS IN LAGRANGE REPRESENTATION!
+        let mut p_coeffs= vec![];
+        for i in 0..p.degree()+1 {
+            p_coeffs.push(p.coeffs()[i]);
+        }
+        for i in (p.degree()+1)..n {
+            p_coeffs.push(E::Fr::zero());
+        }
         let mut value = E::Fr::zero();
         pow_ω = E::Fr::one();
         for i in 0..n {
-            value += (*p).coeffs()[i] * pow_ω * step_4[i];
+            value += p_coeffs[i] * pow_ω * step_4[i];
             pow_ω *= ω;
         }
-        value *= (E::Fr::one() - point.pow([n as u64])) / E::Fr::from(n as u64);
-        println!("value in opening = {}",value);
+        value *= (E::Fr::one() - point.pow([(powers.size()-1) as u64])) / E::Fr::from((powers.size()-1) as u64);
+        // println!("value = {}", value);
 
         let mut witness_poly_coeffs = vec![];
-        for i in 0..p.degree() + 1 {
-            witness_poly_coeffs.push(((*p).coeffs()[i] - value) * step_4[i]);
+        for i in 0..n {
+            witness_poly_coeffs.push((p_coeffs[i] - value) * step_4[i]);
+            // println!("wit={}", (p_coeffs[i] - value) * step_4[i]);
         }
         let witness_poly = P::from_coefficients_vec(witness_poly_coeffs);
         let hiding_witness_poly = None;
         end_timer!(witness_time);
+
 
         let proof = Self::open_with_witness_polynomial(
             powers,
@@ -491,7 +511,7 @@ where
     ) -> Result<bool, Error> {
         let check_time = start_timer!(|| "Checking evaluation");
         let mut inner = comm.0.into_projective() - &vk.g.mul(value);
-        println!("{}", inner);
+        // println!("{}", inner);
 
         if let Some(random_v) = proof.random_v {
             inner -= &vk.gamma_g.mul(random_v);
@@ -845,42 +865,27 @@ mod tests {
 
     #[test]
     fn test_lagrange_verification_smaller_degree() {
-        // We check that commiting with the lagrange basis or the canonical basis lead to the same value.
-        // Of course, it requires having the same β and g in the setup...
-        let rng = &mut test_rng();
+
         let p = DensePoly::from_coefficients_slice(&[
             Fr::from(1u32),
             Fr::from(2u32),
             Fr::from(3u32),
             Fr::from(4u32),
         ]);
-
-        let p2 = DensePoly::from_coefficients_slice(&[
-            Fr::from(1u32),
-            Fr::from(2u32),
-            Fr::from(3u32),
-            Fr::from(4u32),
-            Fr::from(0u32),
-            Fr::from(0u32),
-            Fr::from(0u32),
-            Fr::from(0u32),
-        ]);
         
-        let degree = 4;
+        let degree = 8;
         let hiding_bound = None;
 
-        let rng2 = &mut test_rng();
-        let pp2 = KZG_Bls12_381::setup_with_lagrange::<_>(2*degree, false, rng2).unwrap();
-        let (powers2, vk2) = KZG_Bls12_381::trim(&pp2, degree).unwrap();
+        let rng = &mut test_rng();
+        let pp = KZG_Bls12_381::setup_with_lagrange::<_>(degree, false, rng).unwrap();
+        let (powers, vk) = KZG_Bls12_381::trim(&pp, degree).unwrap();
+
         // commit 
-        let (comm2, rand2) =
-            KZG10::commit(&powers2, &p, hiding_bound, Some(rng2)).unwrap();
-        let (comm2bis, _) =
-        KZG10::commit(&powers2, &p2, hiding_bound, Some(rng2)).unwrap();
-        assert_eq!(comm2, comm2bis);
+        let (comm, rand) =
+        KZG10::commit(&powers, &p, hiding_bound, Some(rng)).unwrap();
         
         // opening
-        let point = Fr::rand(rng2);
+        let point = Fr::rand(rng);
         // barycentric evaluation
         let mut value = Fr::zero();
         let mut pow_ω = Fr::one();
@@ -889,24 +894,15 @@ mod tests {
             pow_ω *= Fr::get_root_of_unity(degree).unwrap();
         }
         value *= (Fr::one() - point.pow([degree as u64])) / Fr::from(degree as u64);
-        println!("value={}",value);
-        let proof2 =
-            KZG10::open_with_lagrange(&powers2, &p, point, &rand2).unwrap();
-
-        value = Fr::zero();
-        pow_ω = Fr::one();
-        for i in 0..p2.degree()+1 {
-            value += p2[i] * pow_ω / (pow_ω - point);
-            pow_ω *= Fr::get_root_of_unity(degree).unwrap();
-        }
-        value *= (Fr::one() - point.pow([(p2.degree()+1) as u64])) / Fr::from((p2.degree()+1) as u64);
-        println!("value={}",value);
-        let proof22 =
-            KZG10::open_with_lagrange(&powers2, &p2, point, &rand2).unwrap();
+        // println!("valeu = {}", value);
+        
+        let proof =
+            KZG10::open_with_lagrange(&powers, &p, point, &rand).unwrap();
+        // println!("proof={}",proof.w);
         
         // verification
         assert!(
-            KZG10::<Bls12_381, UniPoly_381>::check(&vk2, &comm2, point, value, &proof22).unwrap(),
+            KZG10::<Bls12_381, UniPoly_381>::check(&vk, &comm, point, value, &proof).unwrap(),
             "proof was incorrect for max_degree = {}, polynomial_degree = {}, hiding_bound = {:?}",
             degree,
             p.degree(),
