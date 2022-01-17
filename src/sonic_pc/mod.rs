@@ -356,7 +356,7 @@ where
 
         let mut curr_challenge = opening_challenges(opening_challenge_counter);
         opening_challenge_counter += 1;
-        
+
         for (polynomial, rand) in labeled_polynomials.into_iter().zip(rands) {
             let enforced_degree_bounds: Option<&[usize]> = ck
                 .enforced_degree_bounds
@@ -379,7 +379,12 @@ where
         let proof_time = start_timer!(|| "Creating proof for polynomials");
 
         println!("opening");
-        let proof = kzg10::KZG10::open_with_lagrange(&ck.powers(), &combined_polynomial, *point, &combined_rand)?;
+        let proof = kzg10::KZG10::open_with_lagrange(
+            &ck.powers(),
+            &combined_polynomial,
+            *point,
+            &combined_rand,
+        )?;
         end_timer!(proof_time);
         println!("deon");
 
