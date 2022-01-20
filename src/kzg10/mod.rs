@@ -45,14 +45,10 @@ where
             return Err(Error::DegreeIsZero);
         }
         let setup_time = start_timer!(|| format!("KZG10::Setup with degree {}", max_degree));
-        // let β = E::Fr::rand(rng);
-        let beta = E::Fr::from(12u64);
-        // let g = E::G1Projective::rand(rng);
-        let g = E::G1Projective::prime_subgroup_generator();
-        // let gamma_g = E::G1Projective::rand(rng);
-        let gamma_g = E::G1Projective::prime_subgroup_generator();
-        // let h = E::G2Projective::rand(rng);
-        let h = E::G2Projective::prime_subgroup_generator();
+        let beta = E::Fr::rand(rng);
+        let g = E::G1Projective::rand(rng);
+        let gamma_g = E::G1Projective::rand(rng);
+        let h = E::G2Projective::rand(rng);
 
         // polynomials of degree max_degree
         // we want n = max_degree + 1 points in the G1 trusted setup
@@ -155,15 +151,10 @@ where
             return Err(Error::DegreeIsZero);
         }
         let setup_time = start_timer!(|| format!("KZG10::Setup with degree {}", max_degree));
-        // let β = E::Fr::rand(rng);
-        let β = E::Fr::from(12u64);
-        // let g = E::G1Projective::rand(rng);
-        let g = E::G1Projective::prime_subgroup_generator();
-
-        // let gamma_g = E::G1Projective::rand(rng);
-        let gamma_g = E::G1Projective::prime_subgroup_generator();
-        // let h = E::G2Projective::rand(rng);
-        let h = E::G2Projective::prime_subgroup_generator();
+        let β = E::Fr::rand(rng);
+        let g = E::G1Projective::rand(rng);
+        let gamma_g = E::G1Projective::rand(rng);
+        let h = E::G2Projective::rand(rng);
         
         // polynomials of degree max_degree
         // the G1 trusted setup part has n = max_degree+1 points
