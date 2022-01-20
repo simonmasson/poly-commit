@@ -53,9 +53,6 @@ where
         let gamma_g = E::G1Projective::prime_subgroup_generator();
         // let h = E::G2Projective::rand(rng);
         let h = E::G2Projective::prime_subgroup_generator();
-        println!("beta={}", beta);
-        println!("g={}", g);
-        println!("h={}", h);
 
         // polynomials of degree max_degree
         // we want n = max_degree + 1 points in the G1 trusted setup
@@ -81,9 +78,6 @@ where
         );
         end_timer!(g_time);
 
-        for i in 0..powers_of_g.len() {
-            println!("pow^{}g = {}", i, powers_of_g[i]);
-        }
         let gamma_g_time = start_timer!(|| "Generating powers of gamma * G");
         let gamma_g_table = FixedBaseMSM::get_window_table(scalar_bits, window_size, gamma_g);
         let powers_of_gamma_g = FixedBaseMSM::multi_scalar_mul::<E::G1Projective>(
@@ -165,8 +159,7 @@ where
         let β = E::Fr::from(12u64);
         // let g = E::G1Projective::rand(rng);
         let g = E::G1Projective::prime_subgroup_generator();
-        println!("β={}", β);
-        println!("g={}", g);
+
         // let gamma_g = E::G1Projective::rand(rng);
         let gamma_g = E::G1Projective::prime_subgroup_generator();
         // let h = E::G2Projective::rand(rng);
@@ -199,9 +192,7 @@ where
             &lagrange_polys_at_β,
         );
         end_timer!(g_time);
-        for i in 0..powers_of_g.len() {
-            println!("g^{} = {}", i, powers_of_g[i]);
-        }
+
         let gamma_g_time = start_timer!(|| "Generating powers of gamma * G");
         let gamma_g_table = FixedBaseMSM::get_window_table(scalar_bits, window_size, gamma_g);
         let powers_of_gamma_g = FixedBaseMSM::multi_scalar_mul::<E::G1Projective>(
@@ -315,8 +306,7 @@ where
         end_timer!(msm_time);
 
         commitment.add_assign_mixed(&random_commitment);
-        println!("com={}", commitment);
-
+        
         end_timer!(commit_time);
         Ok((Commitment(commitment.into()), randomness))
     }
@@ -408,9 +398,6 @@ where
         let (witness_poly, hiding_witness_poly) = Self::compute_witness_polynomial(p, point, rand)?;
         end_timer!(witness_time);
 
-        for i in 0..witness_poly.coeffs().len() {
-            println!("wit[{}] = 0x{}", i, witness_poly.coeffs()[i].into_repr())
-        }
 
         let proof = Self::open_with_witness_polynomial(
             powers,
@@ -477,21 +464,8 @@ where
         // WARNING THIS IS DANGEROUS IN LAGRANGE REPRESENTATION!
 
         let pad = vec![E::Fr::zero(); n - (p.degree()+1)];
-        let p_coeffs_1 = [p.coeffs(),&pad].concat();
+        let p_coeffs = [p.coeffs(),&pad].concat();
         
-        let mut p_coeffs = vec![];
-        for i in 0..p.degree() + 1 {
-            p_coeffs.push(p.coeffs()[i]);
-        }
-        for _ in (p.degree() + 1)..n {
-            p_coeffs.push(E::Fr::zero());
-        }
-        for i in 0..p_coeffs_1.len() {
-            println!("coeffs1 = {}", p_coeffs_1[i]);
-            println!("coeff   = {}", p_coeffs[i]);
-        }
-        println!("{}, {}", p_coeffs_1.len(), p_coeffs.len());
-        //assert_eq!(p_coeffs_1, p_coeffs);
         let mut value = E::Fr::zero();
         pow_ω = E::Fr::one();
         for i in 0..n {
@@ -506,10 +480,6 @@ where
             witness_poly_coeffs.push((p_coeffs[i] - value) * step_4[i]);
         }
         let witness_poly = P::from_coefficients_vec(witness_poly_coeffs);
-
-        for i in 0..witness_poly.coeffs().len() {
-            println!("wit[{}] = 0x{}", i, witness_poly.coeffs()[i].into_repr())
-        }
 
         let hiding_witness_poly = None;
         end_timer!(witness_time);
@@ -535,7 +505,6 @@ where
         value: E::Fr,
         proof: &Proof<E>,
     ) -> Result<bool, Error> {
-        println!("check-kzg");
         let check_time = start_timer!(|| "Checking evaluation");
         let mut inner = comm.0.into_projective() - &vk.g.mul(value);
 
@@ -988,9 +957,7 @@ mod tests {
             while degree <= 1 {
                 degree = usize::rand(rng) % 20;
             }
-            println!("degree = {}", degree);
             let real_degree = (degree+1).next_power_of_two()-1;
-            println!("real_degree = {}", real_degree);
 
             let p = P::rand(degree, rng);
 
