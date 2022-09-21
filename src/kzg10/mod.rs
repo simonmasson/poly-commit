@@ -221,7 +221,7 @@ where
         Ok((witness_polynomial, random_witness_polynomial))
     }
 
-    pub(crate) fn open_with_witness_polynomial<'a>(
+    pub fn open_with_witness_polynomial<'a>(
         powers: &Powers<E>,
         point: P::Point,
         randomness: &Randomness<E::Fr, P>,
@@ -265,7 +265,7 @@ where
     }
 
     /// On input a polynomial `p` and a point `point`, outputs a proof for the same.
-    pub(crate) fn open<'a>(
+    pub fn open<'a>(
         powers: &Powers<E>,
         p: &P,
         point: P::Point,
@@ -370,7 +370,7 @@ where
         Ok(result)
     }
 
-    pub(crate) fn check_degree_is_too_large(degree: usize, num_powers: usize) -> Result<(), Error> {
+    pub fn check_degree_is_too_large(degree: usize, num_powers: usize) -> Result<(), Error> {
         let num_coefficients = degree + 1;
         if num_coefficients > num_powers {
             Err(Error::TooManyCoefficients {
@@ -382,7 +382,7 @@ where
         }
     }
 
-    pub(crate) fn check_hiding_bound(
+    pub fn check_hiding_bound(
         hiding_poly_degree: usize,
         num_powers: usize,
     ) -> Result<(), Error> {
@@ -401,7 +401,7 @@ where
         }
     }
 
-    pub(crate) fn check_degrees_and_bounds<'a>(
+    pub fn check_degrees_and_bounds<'a>(
         supported_degree: usize,
         max_degree: usize,
         enforced_degree_bounds: Option<&[usize]>,
@@ -469,7 +469,7 @@ mod tests {
     impl<E: PairingEngine, P: UVPolynomial<E::Fr>> KZG10<E, P> {
         /// Specializes the public parameters for a given maximum degree `d` for polynomials
         /// `d` should be less that `pp.max_degree()`.
-        pub(crate) fn trim(
+        pub fn trim(
             pp: &UniversalParams<E>,
             mut supported_degree: usize,
         ) -> Result<(Powers<E>, VerifierKey<E>), Error> {
